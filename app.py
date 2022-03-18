@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, json, request
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import Boolean, Column
+from sqlalchemy import Boolean, Column, Integer
 
 
 # INSTANTIATE APP
@@ -15,7 +15,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
-# CREATE THE SQLALCHEMY MODEL
+# CREATE THE SQLALCHEMY BOOK MODEL
 class Book(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     bookTitle = db.Column(db.String(100))
@@ -165,8 +165,6 @@ def dele_book(id):
 @app.route('/booksGenre', methods=['POST'])
 def get_books_by_genre():
     genre = request.json['genre']
-    print("this is genre")
-    print(genre)
     books = Book.query.filter_by(genre=request.json['genre']).all()
     bookList = []
     for book in books:
@@ -233,9 +231,75 @@ def get_book_by_x_record():
     result = json.dumps(bookList)
     return result
 
+
 ###########################################################################
+#################### PROFILE MANAGEMENT FEATURE ###########################
 ###########################################################################
-###########################################################################
+#id = db.Column(db.Integer, primary_key=True)
+# CREATE THE SQLALCHEMY USER MODEL
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(40))
+    homeAddress = db.Column(db.String(50))
+    email = db.Column(db.String(40))
+    password = db.Column(db.String(40))
+
+    def __init__(self, name, homeAddress, email, password):
+        self.name = name
+        self.homeAddress = homeAddress
+        self.email = email
+        self.password = password
+
+
+# FUNCTION TO RETURN A USER DICTIONARY
+def user_dict(new_user):
+    user = {
+        "id": new_user.id,
+        "name": new_user.name,
+        "homeAddress": new_user.homeAddress,
+        "email": new_user.email,
+        "password": new_user.password
+    }
+    return user
+
+
+# CREATE A USER
+@app.route('/user', methods=['POST'])
+def user():
+
+    # Received posted data and store it in variables
+    name = request.json['name']
+    homeAddres = request.json['homeAddress']
+    email = request.json['email']
+    password = request.json['password']
+    print("this is password" + password)
+    # Create a new user
+    new_user = User(name, homeAddres, email, password)
+
+    # Add a user to the database
+    db.session.add(new_user)
+    db.session.commit()
+
+    # Store all the user data in a variable and return all that data
+    user = user_dict(new_user)
+    return json.dumps(user)
+
+
+# GET A USER BY USERNAME
+@app.route('/userName', methods=['POST'])
+def get_user_by_name():
+    name = request.json['name']
+    users = User.query.filter_by(name=request.json['name']).all()
+    userList = []
+    for user in users:
+        all_users = user_dict(user)
+        userList.append(all_users)
+    result = json.dumps(userList)
+    return result
+
+# Must be able to create a User with username(email), password and optional fields  (name, email address, home
+# address)
+# Must be able to retrieve a User Object and its fields by their username
 
 
 # RUN SERVER
