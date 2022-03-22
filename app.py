@@ -14,6 +14,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # INSTANTIATE THE DATABASE MODEL
 db = SQLAlchemy(app)
 
+# CREATE A WISH LIST (ASSOCIATION TABLE - MANY TO MANY RELATIONSHIP)
+wishList = db.Table('wishlist',
+                    db.Column('user_name', db.String,
+                              db.ForeignKey('user.name')),
+                    db.Column('book_id', db.Integer, db.ForeignKey('book.id'))
+                    )
+
 
 # CREATE THE SQLALCHEMY BOOK MODEL
 class Book(db.Model):
@@ -28,6 +35,7 @@ class Book(db.Model):
     yearPublished = db.Column(db.Integer())
     description = db.Column(db.String(200))
     soldCopies = db.Column(db.Integer())
+    #wihsList_ID = db.Column(db.Integer, db.ForeingKey('wishList.id'))
 
     # isTopSeller = db.Column(db.Boolean, default=False, server_default="false")
 
@@ -165,7 +173,7 @@ def dele_book(id):
 @app.route('/booksGenre', methods=['POST'])
 def get_books_by_genre():
     genre = request.json['genre']
-    books = Book.query.filter_by(genre=request.json['genre']).all()
+    books = Book.query.filter_by(genre).all()
     bookList = []
     for book in books:
         all_books = book_dict(book)
@@ -228,14 +236,14 @@ def get_book_by_x_record():
             i += 1
         else:
             break
-    result = json.dumps(bookList)
+        result = json.dumps(bookList)
     return result
 
 
 ###########################################################################
 #################### PROFILE MANAGEMENT FEATURE ###########################
 ###########################################################################
-#id = db.Column(db.Integer, primary_key=True)
+
 # CREATE THE SQLALCHEMY USER MODEL
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -243,6 +251,8 @@ class User(db.Model):
     homeAddress = db.Column(db.String(50))
     email = db.Column(db.String(40))
     password = db.Column(db.String(40))
+    wishList = db.relationship(
+        'Book', secondary=wishList, backref='inWishList')
 
     def __init__(self, name, homeAddress, email, password):
         self.name = name
@@ -289,7 +299,7 @@ def user():
 @app.route('/userName', methods=['POST'])
 def get_user_by_name():
     name = request.json['name']
-    users = User.query.filter_by(name=request.json['name']).all()
+    users = User.query.filter_by(name).all()
     userList = []
     for user in users:
         all_users = user_dict(user)
@@ -300,6 +310,75 @@ def get_user_by_name():
 # Must be able to create a User with username(email), password and optional fields  (name, email address, home
 # address)
 # Must be able to retrieve a User Object and its fields by their username
+
+
+###########################################################################
+######################## WISH LIST MANAGEMENT #############################
+###########################################################################
+
+
+# ADD A BOOK TO THE USER'S WISH LIST
+@app.route('/wishList/<userName>', methods=['POST'])
+def create_wish_list(userName):
+    # Get the ID from the book's json data passed in the POST request ("id": "#")
+    bookID = request.json['id']
+    # Get the user from the DB
+    user = User.query.filter_by(name=userName).first()
+    # Get the book from the DB
+    book = Book.query.get(bookID)
+    # Add book to the wish list
+    user.wishList.append(book)
+    # Save the wish list into the DB
+    db.session.commit()
+
+    # Return the wish list as json
+    wishList = []
+    for book in user.wishList:
+        result = book_dict(book)
+        wishList.append(result)
+    result = json.dumps(wishList)
+    return result
+
+
+# REMOVE A BOOK FROM A WISH LIST AND SEND TO SHOPPING CART
+@app.route('/wishList/<userName>', methods=['DELETE'])
+def move_to_hopping_cart(userName):
+    # Get the ID from the book's json data passed in the POST request ("id": "#")
+    bookID = request.json['id']
+    # Get the user from the DB
+    user = User.query.filter_by(name=userName).first()
+    # Get the book from the DB
+    book = Book.query.get(bookID)
+    # Remove book from the wish list
+    user.wishList.remove(book)
+    # Save the wish list into the DB
+    db.session.commit()
+    # Send book to shopping cart
+    # ________________________________
+    # Return book removed from wish list
+    my_book = book_dict(book)
+    return json.dumps(my_book)
+
+
+# LIST OF BOOKS IN A USER'S WISH LIST
+@app.route('/wishList/<userName>', methods=['GET'])
+def get_wishlist(userName):
+    # Get the user from the DB
+    user = User.query.filter_by(name=userName).first()
+    # Get the list of books
+    userList = user.wishList
+    wishList = []
+    # Return the wish list as json
+    for book in userList:
+        result = book_dict(book)
+        wishList.append(result)
+    result = json.dumps(wishList)
+    return result
+
+# Must be able to create a wishlist of books that belongs to user and has a unique name
+# Must be able to add a book to a user’s wishlisht
+# Must be able to remove a book from a user’s wishlist into the user’s shopping cart
+# Must be able to list the book’s in a user’s wishlist
 
 
 # RUN SERVER
@@ -320,3 +399,21 @@ if __name__ == '__main__':
 # >>> Book.query.all()
 # [<Book 1>, <Book 2>]
 # >>> Book.query.get(1)
+
+# MANY TO MANY REALATIONSHIP
+# monica=User.query.get(1)
+# book = Book.query.get(2)
+# monica.wishList.append(book)
+
+# >>> book.inWishList (this will return a list and can be accessed with a loop)
+# [<User 1>]
+# >>> monica.wishList
+# [<Book 2>]
+
+# >>> User.query.get(1).wishList
+# [<Book 2>]
+# >>> Book.query.get(2).inWishList
+# [<User 1>]
+
+# remove items from the list
+# monica.wishList.remove(book)
